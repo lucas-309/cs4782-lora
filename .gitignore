@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+data/cache/
+data/glue/
+results/checkpoints/
+results/*.log
+*.log
+.ipynb_checkpoints/
+final_deliverables.pdf
+poster/poster.aux
+poster/tex.log
+
