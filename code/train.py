@@ -121,6 +121,7 @@ def main():
     p.add_argument("--method", choices=["lora", "full", "head"], default="lora")
     p.add_argument("--rank", type=int, default=8)
     p.add_argument("--alpha", type=int, default=16)
+    p.add_argument("--dropout", type=float, default=0.0)
     p.add_argument("--lr", type=float, default=None)
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--batch-size", type=int, default=32)
@@ -150,7 +151,7 @@ def main():
     )
 
     if args.method == "lora":
-        wrapped = inject_lora(model, LoRAConfig(r=args.rank, alpha=args.alpha))
+        wrapped = inject_lora(model, LoRAConfig(r=args.rank, alpha=args.alpha, dropout=args.dropout))
         mark_only_lora_and_head_trainable(model)
         print(f"[lora] wrapped {wrapped} linear layers, r={args.rank}, alpha={args.alpha}")
     elif args.method == "head":
