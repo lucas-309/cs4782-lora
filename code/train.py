@@ -187,6 +187,7 @@ def main():
             out = model(**batch)
             loss = out.loss
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optim.step()
             sched.step()
             optim.zero_grad()
