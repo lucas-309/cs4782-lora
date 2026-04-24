@@ -12,3 +12,16 @@ final_deliverables.pdf
 poster/poster.aux
 poster/tex.log
 
+# HuggingFace cache
+.cache/
+hub/
+
+# PyTorch artifacts
+*.pt
+*.pth
+*.pkl
+
+# wandb
+wandb/
+outputs/
+
