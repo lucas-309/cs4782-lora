@@ -34,6 +34,7 @@ TASK_INFO = {
     "cola": (("sentence", None), 2, "matthews_correlation"),
     "stsb": (("sentence1", "sentence2"), 1, "pearson"),
     "qnli": (("question", "sentence"), 2, "accuracy"),
+    "mnli": (("premise", "hypothesis"), 3, "accuracy"),
 }
 
 
