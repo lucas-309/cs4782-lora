@@ -1,0 +1,74 @@
+{
+  "args": {
+    "task": "mrpc",
+    "method": "lora",
+    "rank": 1,
+    "alpha": 16,
+    "lr": 0.0005,
+    "epochs": 3,
+    "batch_size": 32,
+    "max_len": 128,
+    "seed": 42,
+    "model": "roberta-base",
+    "out": "results/runs",
+    "max_train_steps": null
+  },
+  "trainable": 628994,
+  "total": 124684034,
+  "steps": [
+    {
+      "step": 0,
+      "loss": 0.6973066329956055
+    },
+    {
+      "step": 50,
+      "loss": 0.6493216753005981
+    },
+    {
+      "step": 100,
+      "loss": 0.4921315908432007
+    },
+    {
+      "step": 150,
+      "loss": 0.28435975313186646
+    },
+    {
+      "step": 200,
+      "loss": 0.5010732412338257
+    },
+    {
+      "step": 250,
+      "loss": 0.5076773166656494
+    },
+    {
+      "step": 300,
+      "loss": 0.3997427821159363
+    }
+  ],
+  "eval": [
+    {
+      "epoch": 1,
+      "step": 115,
+      "elapsed_s": 131.34286093711853,
+      "accuracy": 0.6985294117647058
+    },
+    {
+      "epoch": 2,
+      "step": 230,
+      "elapsed_s": 256.2143340110779,
+      "accuracy": 0.8529411764705882
+    },
+    {
+      "epoch": 3,
+      "step": 345,
+      "elapsed_s": 384.7554180622101,
+      "accuracy": 0.8602941176470589
+    }
+  ],
+  "final": {
+    "epoch": 3,
+    "step": 345,
+    "elapsed_s": 384.7554180622101,
+    "accuracy": 0.8602941176470589
+  }
+}
