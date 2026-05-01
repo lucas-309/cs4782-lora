@@ -1,0 +1,13 @@
+\begin{tabular}{llrr}
+\toprule
+Task & Method & Trainable & Score \\
+\midrule
+MRPC & Full fine-tune & 124.65M & 0.882 \\
+MRPC & LoRA $r{=}8$ & 0.89M & 0.863 \\
+MRPC & LoRA $r{=}4$ & 0.74M & 0.865 \\
+MRPC & LoRA $r{=}2$ & 0.67M & 0.858 \\
+MRPC & LoRA $r{=}1$ & 0.63M & 0.860 \\
+MRPC & Head only & 0.59M & 0.684 \\
+SST2 & LoRA $r{=}8$ & 0.89M & 0.931 \\
+\bottomrule
+\end{tabular}
