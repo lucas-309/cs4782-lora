@@ -1,0 +1,175 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{fontspec}
+\setmainfont{Helvetica Neue}[
+  UprightFont = * Medium,
+  BoldFont    = * Bold,
+  ItalicFont  = * Medium Italic,
+]
+\setmonofont{Menlo}[Scale=0.92]
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath, amssymb}
+\usepackage{enumitem}
+\setlist{nosep, leftmargin=1.2em, itemsep=2pt}
+\usepackage{titlesec}
+\usepackage[colorlinks=true,urlcolor=blue!50!black,linkcolor=black,citecolor=black]{hyperref}
+
+\definecolor{accent}{HTML}{B31B1B}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt}
+\titlespacing*{\section}{0pt}{8pt}{4pt}
+
+\title{\vspace{-2em}\textbf{Reproducing LoRA on RoBERTa-base}\\
+       \large CS 4782 Final Project Summary}
+\author{Lucas He, Partner \\
+        \small Cornell University, Spring 2026}
+\date{\vspace{-1em}}
+
+\begin{document}
+\maketitle
+\vspace{-1.5em}
+
+\section*{1. Introduction}
+
+Fine-tuning a 175B-parameter language model for every downstream task is
+prohibitive: a fresh full copy of the model per task costs as much as the
+original training run and produces a 350\,GB checkpoint. \textbf{LoRA: Low-Rank
+Adaptation of Large Language Models} (Hu et al., 2021)\,\footnote{\href{https://arxiv.org/abs/2106.09685}{arXiv:2106.09685}}
+sidesteps this by freezing the pre-trained weights and adding a trainable
+\emph{rank-$r$} decomposition $\Delta W = BA$ in parallel to selected weight
+matrices. The forward pass becomes $h = W_0 x + (\alpha/r) BA\, x$, with $A
+\in \mathbb{R}^{r \times d}$ and $B \in \mathbb{R}^{d \times r}$. The paper's
+central empirical claim is that this update has very low intrinsic rank ---
+even $r{=}1$ or $r{=}2$ is enough to match full fine-tuning on many tasks.
+
+\section*{2. Chosen result}
+
+We reproduce a slice of \textbf{Table 2} of Hu et al.\ (2021): \textbf{RoBERTa-base
+on GLUE}, comparing LoRA against full fine-tuning. Specifically we target
+the \textbf{MRPC} cell (RoBERTa$_\text{base}$ + LoRA: 87.5; FT: 90.2) as
+the headline result, and we additionally rerun the \textbf{rank ablation}
+of Table 6 ($r \in \{1,2,4,8\}$) on RoBERTa-base / MRPC as our independent
+experiment. We chose this slice because (i) it tests the central claim of
+the paper at a scale a single Apple M-series GPU can handle in $\sim$5\,min
+per run, and (ii) it lets us evaluate \emph{both} the parameter-efficiency
+claim (LoRA matches FT with a tiny fraction of the params) and the
+intrinsic-rank claim (rank doesn't matter much) with the same backbone.
+
+\section*{3. Methodology}
+
+\textbf{Implementation.} We wrote LoRA from scratch in $\sim$60 lines
+(\texttt{code/lora.py}): a \texttt{LoRALinear} module wraps an
+\texttt{nn.Linear}, adds trainable \texttt{lora\_A} (Kaiming-init) and
+\texttt{lora\_B} (zero-init), and freezes the base linear. A helper walks
+the model and replaces every attention \texttt{query} and \texttt{value}
+projection with a \texttt{LoRALinear} of the chosen rank --- following
+Table 5's recommendation that $\{W_q, W_v\}$ is the best two-target
+configuration under a fixed parameter budget. We mark only LoRA parameters
+and the new classification head as trainable. We deliberately avoid
+\texttt{peft} so we know exactly what is being trained.
+
+\textbf{Datasets.} GLUE MRPC (3.7k paraphrase pairs, accuracy) and SST-2
+(67k sentiment sentences, accuracy), via \texttt{datasets.load\_dataset}.
+
+\textbf{Training.} AdamW (weight decay 0.01), linear warmup over 6\% of
+steps then linear decay. LoRA at $\text{lr}{=}5\!\times\!10^{-4}$,
+full fine-tuning at $\text{lr}{=}2\!\times\!10^{-5}$. Batch size 32, max
+sequence length 128, seed 42. MRPC: 3 epochs (115 steps each); SST-2: 2000
+steps ($\sim$1 epoch) due to wall-clock budget. Hardware: one Apple M-series
+GPU via PyTorch MPS.
+
+\textbf{Modifications.} (a) RoBERTa-base instead of the paper's headline
+GPT-3 175B (the paper still reports a RoBERTa-base cell, so we reproduce
+that). (b) We add a \emph{head-only} baseline (frozen body, train only the
+classifier) to verify that LoRA's lift is genuine. (c) The rank ablation
+is on RoBERTa-base / MRPC rather than GPT-3 / WikiSQL.
+
+\section*{4. Results \& analysis}
+
+\textbf{Headline (MRPC).} Full FT 88.2\%; LoRA $r{=}8$ 86.3\%; LoRA $r{=}1$
+86.0\%; head-only 68.4\%. Our LoRA number is $\sim$1.2 points below the
+paper's reported RoBERTa$_\text{base}$ + LoRA (87.5\%) --- plausibly because
+we use a single seed and fixed LR (the paper sweeps), and start from
+RoBERTa-base instead of the MNLI-warm-started checkpoint that some prior
+GLUE work uses for MRPC. The 18-point gap between LoRA and head-only is
+the load-bearing observation: LoRA's lift is from the low-rank adaptation,
+not from bookkeeping in the new classifier head.
+
+\textbf{Rank ablation (MRPC).}
+\vspace{-2pt}
+\begin{center}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+$r$ & 1 & 2 & 4 & 8 \\
+Trainable params & 629K & 666K & 739K & 887K \\
+MRPC accuracy & 0.860 & 0.858 & 0.865 & 0.863 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-2pt}
+The spread across ranks is 0.7 points, well within seed-to-seed noise on
+the 408-example MRPC validation set ($\sim$0.24 points per misclassified
+example). This reproduces the qualitative finding of Table 6 of the paper:
+increasing $r$ does not unlock new directions in the update, suggesting
+$\Delta W$ has a very low intrinsic rank.
+
+\textbf{Second task (SST-2).} LoRA $r{=}8$ reaches \textbf{93.1\%} in a
+$\sim$1-epoch budget; paper reports 95.1\% at the full sweep, a 2-point gap
+that we expect closes with more steps.
+
+\textbf{Discrepancies / challenges.} (i) \emph{The new classifier head
+dominates the trainable count} at 125M scale: at $r{=}8$, $\sim$295K params
+are LoRA and $\sim$592K are the head. The paper's ``10{,}000$\times$
+headline'' is for GPT-3 175B where the head is negligible --- we frame the
+poster accordingly. (ii) MRPC's 408-example validation set has high
+seed-to-seed variance; with more compute we would average over 3+ seeds.
+(iii) Apple MPS throughput is $\sim 1/3$--$1/4$ of a V100, which set the
+ceiling on what we could sweep.
+
+\textbf{In context.} The reproduction supports the paper's core argument:
+fine-tuning is overparametrized, and a tiny additive low-rank update suffices
+to adapt a pretrained Transformer. That this holds at 125M --- not just at
+175B --- is encouraging for practitioners on modest hardware.
+
+\section*{5. Reflections}
+
+\begin{itemize}
+\item \textbf{From-scratch was the right call.} LoRA's machinery is small
+enough that re-implementing it forced us to internalize what's frozen,
+what's trained, and how the update scales with $r$ and $\alpha$. Calling
+\texttt{peft.LoraConfig(\dots)} would have left that opaque.
+\item \textbf{The crucial hyperparameter wasn't $r$ --- it was the LR.}
+LoRA needs roughly $25\times$ the LR of full fine-tuning ($5e{-}4$ vs.\ $2e{-}5$)
+because the matrices are tiny and zero-initialized; runs at $2e{-}5$ stayed
+near random.
+\item \textbf{Future directions.} (a) LoRA on MLP layers (the paper defers
+this); (b) the subspace-overlap test from \S7.2 --- do different seeds
+learn the same low-rank subspace? (c) full-rank fine-tuning on \emph{just}
+$W_q$ and $W_v$, to separate ``low rank'' from ``few parameters.''
+\item \textbf{With more compute:} 3 seeds per cell, LR sweep per rank, and
+DeBERTa-XXL on one task --- the paper's DeBERTa numbers are its sharpest
+match to full FT and would make for a more striking headline.
+\end{itemize}
+
+\section*{6. References}
+
+\begin{itemize}
+\item Hu, E.J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S.,
+Wang, L., Chen, W. (2021). \emph{LoRA: Low-Rank Adaptation of Large
+Language Models}. \href{https://arxiv.org/abs/2106.09685}{arXiv:2106.09685}.
+\item Aghajanyan, A., Zettlemoyer, L., Gupta, S. (2020). \emph{Intrinsic
+Dimensionality Explains the Effectiveness of Language Model Fine-Tuning}.
+ACL 2021.
+\item Liu, Y. et al.\ (2019). \emph{RoBERTa: A Robustly Optimized BERT
+Pretraining Approach}. \href{https://arxiv.org/abs/1907.11692}{arXiv:1907.11692}.
+\item Wang, A. et al.\ (2019). \emph{GLUE: A Multi-Task Benchmark and
+Analysis Platform for Natural Language Understanding}. ICLR.
+\item Tools: PyTorch 2.11 (\texttt{pytorch.org}), Hugging Face
+\texttt{transformers} and \texttt{datasets}, Tectonic LaTeX engine.
+\end{itemize}
+
+\end{document}
