@@ -25,6 +25,7 @@ from transformers import (
 )
 
 from lora import LoRAConfig, count_trainable, inject_lora, mark_only_lora_and_head_trainable
+from xsa import apply_xsa
 
 # GLUE task -> (text fields, num labels, metric)
 TASK_INFO = {
@@ -133,6 +134,8 @@ def main():
     p.add_argument("--out", default="results/runs")
     p.add_argument("--max-train-steps", type=int, default=None,
                    help="Cap training steps for fast iteration on a laptop.")
+    p.add_argument("--xsa", action="store_true",
+                   help="Apply Exclusive Self-Attention: project out self-value component from attention output.")
     args = p.parse_args()
 
     if args.lr is None:
@@ -146,11 +149,12 @@ def main():
     is_regression = metric == "pearson"
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model,
-        num_labels=num_labels,
-        problem_type="regression" if is_regression else None,
-    )
+    model_kwargs = {"num_labels": num_labels}
+    if is_regression:
+        model_kwargs["problem_type"] = "regression"
+    if args.xsa:
+        model_kwargs["attn_implementation"] = "eager"
+    model = AutoModelForSequenceClassification.from_pretrained(args.model, **model_kwargs)
 
     if args.method == "lora":
         wrapped = inject_lora(model, LoRAConfig(r=args.rank, alpha=args.alpha, dropout=args.dropout))
@@ -159,6 +163,10 @@ def main():
     elif args.method == "head":
         for name, par in model.named_parameters():
             par.requires_grad = "classifier" in name
+
+    if args.xsa:
+        n_patched = apply_xsa(model)
+        print(f"[xsa] patched {n_patched} self-attention modules")
 
     trainable, total = count_trainable(model)
     print(f"[params] trainable={trainable:,} total={total:,} ({100*trainable/total:.3f}%)")
@@ -176,6 +184,8 @@ def main():
 
     Path(args.out).mkdir(parents=True, exist_ok=True)
     run_id = f"{args.task}_{args.method}_r{args.rank}_s{args.seed}"
+    if args.xsa:
+        run_id += "_xsa"
     log_path = Path(args.out) / f"{run_id}.json"
     history = {"args": vars(args), "trainable": trainable, "total": total, "steps": [], "eval": []}
 

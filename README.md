@@ -35,12 +35,22 @@ We additionally run a **rank ablation** (independent experiment, beyond the
 paper) sweeping `r ∈ {1, 2, 4, 8}` on MRPC. Even `r=1` is within noise of `r=8`,
 reproducing the "low intrinsic rank" finding at small-model scale.
 
+As a further exploration, we also test whether LoRA can absorb an
+attention-level architectural change at fine-tuning time:
+**Exclusive Self-Attention (XSA)**, which projects each head's attention
+output away from its own value vector. XSA was proposed for from-scratch
+training, so we ask whether a pretrained backbone with only a small LoRA
+budget can compensate for it. Across all ranks on MRPC and on SST-2 at `r=8`,
+XSA costs ~1 accuracy point — a useful negative result reported in
+[`report/report.pdf`](report/report.pdf) §4.
+
 ## 3. Repository structure
 
 ```
 .
 ├── code/             # LoRA implementation + training / orchestration scripts
 │   ├── lora.py       # ~60-line LoRALinear module + injection helper
+│   ├── xsa.py        # Exclusive Self-Attention patch (exploration)
 │   ├── train.py      # GLUE training script (LoRA / full FT / head-only)
 │   ├── plot_results.py
 │   ├── run_all.sh    # full sweep
@@ -93,6 +103,7 @@ The single-experiment entrypoint, useful for one-off sanity checks:
 ```bash
 python code/train.py --task mrpc --method lora --rank 8 --epochs 3
 python code/train.py --task mrpc --method full --epochs 3
+python code/train.py --task mrpc --method lora --rank 8 --epochs 3 --xsa  # XSA exploration
 ```
 
 GPU is recommended but not strictly required: MRPC trains in ~5 min on MPS,
@@ -111,6 +122,11 @@ GPU is recommended but not strictly required: MRPC trains in ~5 min on MPS,
 - **Caveat on parameter counts.** On a 125M model the new classification
   head dominates the trainable budget. The 10,000× claim in the paper is for
   GPT-3 175B, where the head is negligible.
+- **XSA + LoRA hurts by ~1 point.** Inserting Exclusive Self-Attention at
+  fine-tuning time costs accuracy at every rank on MRPC (and on SST-2 at
+  `r=8`). LoRA trains stably under XSA, but its small parameter budget
+  cannot fully absorb the layerwise distribution shift introduced after
+  pretraining — XSA is not a drop-in fine-tuning-time modification here.
 
 ## 7. Conclusion
 

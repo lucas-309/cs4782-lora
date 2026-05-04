@@ -4,6 +4,7 @@ Outputs to figures/:
     rank_ablation.pdf   - accuracy vs r on MRPC
     parameter_efficiency.pdf  - trainable-param bar chart
     training_curve.pdf  - LoRA vs full FT loss curves on MRPC
+    xsa_comparison.pdf  - baseline vs LoRA + XSA across ranks on MRPC
     headline_table.tex  - LaTeX-formatted results table
 """
 from __future__ import annotations
@@ -177,6 +178,49 @@ def plot_training_curves(runs: dict) -> None:
     print("[saved] training_curve.pdf")
 
 
+def plot_xsa_comparison(runs: dict) -> None:
+    """Compare LoRA baseline vs LoRA + XSA across ranks on MRPC."""
+    baseline, xsa = {}, {}
+    for name, run in runs.items():
+        a = run["args"]
+        if a.get("task") != "mrpc" or a.get("method") != "lora":
+            continue
+        is_xsa = a.get("xsa", False) or name.endswith("_xsa")
+        (xsa if is_xsa else baseline)[a["rank"]] = final_metric(run)
+
+    ranks = sorted(set(baseline) & set(xsa))
+    if not ranks:
+        print("[skip] xsa_comparison: missing baseline/xsa pairs")
+        return
+    base_accs = [baseline[r] for r in ranks]
+    xsa_accs = [xsa[r] for r in ranks]
+
+    fig, ax = plt.subplots(figsize=(5.0, 3.2))
+    ax.plot(ranks, base_accs, "o-", color=ACCENT, linewidth=2.5, markersize=10,
+            label="LoRA (baseline)")
+    ax.plot(ranks, xsa_accs, "s--", color=INK, linewidth=2.0, markersize=9,
+            label="LoRA + XSA")
+    ax.set_xscale("log", base=2)
+    ax.set_xticks(ranks)
+    ax.set_xticklabels([str(r) for r in ranks])
+    ax.set_xlabel("LoRA rank $r$", fontsize=12)
+    ax.set_ylabel("MRPC accuracy", fontsize=12)
+    ax.set_title("XSA hurts at every rank under LoRA", fontsize=13, color=INK, pad=10)
+    ax.set_ylim(0.83, 0.88)
+    ax.grid(axis="y", alpha=0.3)
+    for r, b in zip(ranks, base_accs):
+        ax.annotate(f"{b:.3f}", (r, b), textcoords="offset points",
+                    xytext=(0, 8), ha="center", fontsize=9, color=ACCENT)
+    for r, x in zip(ranks, xsa_accs):
+        ax.annotate(f"{x:.3f}", (r, x), textcoords="offset points",
+                    xytext=(0, -14), ha="center", fontsize=9, color=INK)
+    ax.legend(loc="lower right", frameon=False, fontsize=10)
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "xsa_comparison.pdf", bbox_inches="tight")
+    plt.close(fig)
+    print("[saved] xsa_comparison.pdf")
+
+
 def write_headline_table(runs: dict) -> None:
     """A small TeX snippet listing the headline numbers."""
     rows = []
@@ -215,6 +259,7 @@ def main():
     plot_rank_ablation(runs)
     plot_parameter_efficiency(runs)
     plot_training_curves(runs)
+    plot_xsa_comparison(runs)
     write_headline_table(runs)
 
 
