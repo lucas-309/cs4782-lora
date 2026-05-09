@@ -4,7 +4,7 @@ A from-scratch reproduction of **LoRA: Low-Rank Adaptation of Large Language Mod
 ([Hu et al., 2021](https://arxiv.org/abs/2106.09685)) on RoBERTa-base, evaluated
 on the GLUE benchmark. CS 4782 (Spring 2026), Cornell University.
 
-**Authors:** Lucas He, Partner
+**Authors:** Lucas He, Aden Zhao
 
 ## 1. Introduction
 
@@ -27,7 +27,7 @@ Headline numbers from our run on **MRPC**:
 | LoRA `r=8`        | 0.89M            | 0.863         |
 | Full fine-tuning  | 124.6M           | 0.882         |
 
-LoRA is **2 points behind full fine-tuning while training ~140× fewer
+LoRA is **about 2 points behind full fine-tuning while training about 0.7% of the
 parameters**, and head-only is 18 points behind — confirming that the LoRA
 update is doing real work, not just the new classifier head.
 
@@ -56,8 +56,8 @@ XSA costs ~1 accuracy point — a useful negative result reported in
 │   ├── run_all.sh    # full sweep
 │   └── run_remaining.sh
 ├── results/runs/     # per-run JSON logs (final metric, training history)
-├── figures/          # poster figures generated from results/runs/
-├── poster/           # 36"×24" landscape poster (LaTeX → PDF via tectonic)
+├── figures/          # result figures generated from results/runs/
+├── poster/           # 36"×24" landscape poster PDF
 ├── report/           # 2-page project summary
 ├── references/       # the original LoRA paper PDF
 ├── LICENSE           # MIT
@@ -86,17 +86,17 @@ XSA costs ~1 accuracy point — a useful negative result reported in
 # 1. Set up Python 3.11 venv and install dependencies
 uv venv --python 3.11 .venv
 source .venv/bin/activate
-uv pip install torch transformers datasets scikit-learn matplotlib scipy numpy
+uv pip install -r requirements.txt
 
 # 2. Run the full sweep (~60–90 min on Apple M-series)
 bash code/run_all.sh         # writes results/runs/*.json
 
-# 3. Generate poster figures
+# 3. Generate result figures
 python code/plot_results.py  # writes figures/*.pdf
-
-# 4. Build the poster (requires tectonic)
-cd poster && tectonic poster.tex
 ```
+
+The submitted poster is at `poster/poster.pdf`; the final summary report is at
+`report/report.pdf`.
 
 The single-experiment entrypoint, useful for one-off sanity checks:
 
@@ -154,10 +154,9 @@ parameters frozen and the right ones trainable; the LoRA module itself is
 - **RoBERTa.** Liu et al. *RoBERTa: A Robustly Optimized BERT Pretraining
   Approach.* arXiv:1907.11692.
 - **Tools.** PyTorch, Hugging Face `transformers` and `datasets`,
-  `tectonic` (for the LaTeX poster).
+  `tectonic` (for rendering `report/report.tex`).
 
 ## 9. Acknowledgements
 
-This work was completed for **CS 4782, Cornell University, Spring 2026**,
-under the guidance of the course staff. We thank the authors of the original
-LoRA paper for releasing a clear, reproducible method.
+This work was completed as a final project for **CS 4782, Cornell University,
+Spring 2026**.

@@ -10,6 +10,7 @@ Outputs to figures/:
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -23,6 +24,12 @@ FIG_DIR.mkdir(parents=True, exist_ok=True)
 ACCENT = "#B31B1B"
 INK = "#222222"
 MUTED = "#888888"
+PDF_METADATA = {
+    "Creator": "code/plot_results.py",
+    "Producer": "matplotlib",
+    "CreationDate": datetime(2026, 1, 1, tzinfo=timezone.utc),
+    "ModDate": datetime(2026, 1, 1, tzinfo=timezone.utc),
+}
 
 plt.rcParams.update({
     "font.family": "sans-serif",
@@ -98,7 +105,7 @@ def plot_rank_ablation(runs: dict) -> None:
                     xytext=(0, 8), ha="center", fontsize=10, color=INK)
     ax.legend(loc="lower right", frameon=False, fontsize=9)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "rank_ablation.pdf", bbox_inches="tight")
+    fig.savefig(FIG_DIR / "rank_ablation.pdf", bbox_inches="tight", metadata=PDF_METADATA)
     plt.close(fig)
     print("[saved] rank_ablation.pdf")
 
@@ -140,7 +147,7 @@ def plot_parameter_efficiency(runs: dict) -> None:
         ax.annotate(f"{a:.3f}", (x, p), textcoords="offset points",
                     xytext=(0, 5), ha="center", fontsize=10, color=INK)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "parameter_efficiency.pdf", bbox_inches="tight")
+    fig.savefig(FIG_DIR / "parameter_efficiency.pdf", bbox_inches="tight", metadata=PDF_METADATA)
     plt.close(fig)
     print("[saved] parameter_efficiency.pdf")
 
@@ -173,7 +180,7 @@ def plot_training_curves(runs: dict) -> None:
     ax.legend(frameon=False, fontsize=10)
     ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "training_curve.pdf", bbox_inches="tight")
+    fig.savefig(FIG_DIR / "training_curve.pdf", bbox_inches="tight", metadata=PDF_METADATA)
     plt.close(fig)
     print("[saved] training_curve.pdf")
 
