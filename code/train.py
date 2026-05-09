@@ -34,6 +34,7 @@ TASK_INFO = {
     "cola": (("sentence", None), 2, "matthews_correlation"),
     "stsb": (("sentence1", "sentence2"), 1, "pearson"),
     "qnli": (("question", "sentence"), 2, "accuracy"),
+    "mnli": (("premise", "hypothesis"), 3, "accuracy"),
 }
 
 
@@ -121,6 +122,8 @@ def main():
     p.add_argument("--method", choices=["lora", "full", "head"], default="lora")
     p.add_argument("--rank", type=int, default=8)
     p.add_argument("--alpha", type=int, default=16)
+    p.add_argument("--dropout", type=float, default=0.0)
+    p.add_argument("--warmup-ratio", type=float, default=0.06)
     p.add_argument("--lr", type=float, default=None)
     p.add_argument("--epochs", type=int, default=3)
     p.add_argument("--batch-size", type=int, default=32)
@@ -150,7 +153,7 @@ def main():
     )
 
     if args.method == "lora":
-        wrapped = inject_lora(model, LoRAConfig(r=args.rank, alpha=args.alpha))
+        wrapped = inject_lora(model, LoRAConfig(r=args.rank, alpha=args.alpha, dropout=args.dropout))
         mark_only_lora_and_head_trainable(model)
         print(f"[lora] wrapped {wrapped} linear layers, r={args.rank}, alpha={args.alpha}")
     elif args.method == "head":
@@ -169,7 +172,7 @@ def main():
     print(f"[data] train_batches/epoch={n_steps_per_epoch}, val_batches={len(val_loader)}, total_steps={n_total}")
 
     optim = AdamW([p for p in model.parameters() if p.requires_grad], lr=args.lr, weight_decay=0.01)
-    sched = get_linear_schedule_with_warmup(optim, num_warmup_steps=int(0.06 * n_total), num_training_steps=n_total)
+    sched = get_linear_schedule_with_warmup(optim, num_warmup_steps=int(args.warmup_ratio * n_total), num_training_steps=n_total)
 
     Path(args.out).mkdir(parents=True, exist_ok=True)
     run_id = f"{args.task}_{args.method}_r{args.rank}_s{args.seed}"
@@ -186,6 +189,7 @@ def main():
             out = model(**batch)
             loss = out.loss
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optim.step()
             sched.step()
             optim.zero_grad()
